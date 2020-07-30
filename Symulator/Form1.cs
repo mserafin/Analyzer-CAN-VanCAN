@@ -61,6 +61,7 @@ namespace Symulator
             timer.Tick += Timer_Tick;
         }
 
+        public const int FRAME_LENGTH = 16;
         public const int REC_BUFFER_SIZE = 500;
         public const int READ_TIMEOUT = 500;
         public const int WRITE_TIMEOUT = 500;
@@ -79,7 +80,7 @@ namespace Symulator
                 serialPort.ReadTimeout = READ_TIMEOUT;
                 serialPort.WriteTimeout = WRITE_TIMEOUT;
                 //serialPort.ReadBufferSize = REC_BUFFER_SIZE;
-                serialPort.ReceivedBytesThreshold = 15;
+                //serialPort.ReceivedBytesThreshold = FRAME_LENGTH;
                 serialPort.DataReceived += SerialPort_DataReceived;
 
                 serialPort.Open();
@@ -177,25 +178,24 @@ namespace Symulator
             //    Console.WriteLine($"Index: {++index}, Ilość danych: {data.Length}");
             //}, 10);
 
-            if (buffer.Length % 15 != 0)
+            if (buffer.Length % FRAME_LENGTH != 0)
             {
                 Console.WriteLine("Ramka nie pełna");
             }
 
             txtResData.Invoke(() =>
             {
-                for (int i = 0, l = buffer.Length; i < l; i += 15)
+                for (int i = 0, l = buffer.Length; i < l; i += FRAME_LENGTH)
                 {
-                    var data = buffer.Skip(i).Take(15).ToArray();
+                    var data = buffer.Skip(i).Take(FRAME_LENGTH).ToArray();
                     var frame = Frame.Builder().With(data);
 
                     var a = frame.CanId;
                     var b = frame.Data;
                     var c = frame.Length;
-                    var d = frame.Type;
 
                     txtResData.AppendText($"<- {string.Join(", ", data)}\n");
-                    txtResData.AppendText($"<- {frame.Type}, {frame.CanId}, {frame.Length}, {string.Join(", ", frame.Data)}\n");
+                    txtResData.AppendText($"<- Data: {frame.CanId}, {frame.Length}, {string.Join(", ", frame.Data)}\n");
 
                     //txtResData.AppendText($"<- {Encoding.UTF8.GetString(frame, 0, frame.Length)}\n");
                 }

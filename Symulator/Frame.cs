@@ -30,19 +30,12 @@ namespace Symulator
         {
             this.RawData.AddRange(bytes);
 
-            this.Type = (FrameType)bytes[0];
-
             if (!this.isValid(bytes))
             {
                 return;
             }
 
-            switch (this.Type)
-            {
-                case FrameType.FRAME_STANDARD: this.dataStandardFrame(bytes); break;
-                case FrameType.FRAME_EXTENDED: this.dataExtendedFrame(bytes); break;
-            }
-
+            this.dataFrame(bytes);
         }
 
         private void dataExtendedFrame(byte[] bytes)
@@ -53,11 +46,11 @@ namespace Symulator
 
         private void dataFrame(byte[] bytes)
         {
-            this.Length = bytes[5];
+            this.Length = bytes[6];
 
-            byte[] data = bytes.Skip(1).Take(4).ToArray();
+            byte[] data = bytes.Skip(2).Take(4).ToArray();
             this.CanId = BitConverter.ToUInt32(data.Reverse().ToArray(), 0);
-            this.Data = bytes.Skip(6).Take(this.Length).ToArray();
+            this.Data = bytes.Skip(7).Take(this.Length).ToArray();
         }
 
         private void dataStandardFrame(byte[] bytes)
