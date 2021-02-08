@@ -1,9 +1,10 @@
 ﻿using Ets2SdkClient;
+using Symulator.Application;
+using Symulator.Infrastructure.datagrid;
 using System;
 using System.Data;
 using System.IO.Ports;
 using System.Linq;
-using System.Text;
 using System.Windows.Forms;
 
 namespace Symulator
@@ -15,27 +16,36 @@ namespace Symulator
         GEARS = 0x18F
     }
 
-    public partial class Form1 : Form
+    public partial class MainPresenter : Form
     {
         private readonly Ets2SdkTelemetry telemetry;
         private readonly FramesSenderService senderService;
         private readonly FramesSender sender;
 
+        private readonly IMainApplicationService mainService = new MainApplicationService();
+        private readonly BindingSourceInvoke dataBindingSource;
+
         private SerialPort serialPort;
         private Timer timer;
         private bool isStartTimer;
 
-        private ResponseSupport<byte> response;
+        public const int REC_BUFFER_SIZE = 500;
+        public const int READ_TIMEOUT = 500;
+        public const int WRITE_TIMEOUT = 500;
 
-        public Form1()
+        public MainPresenter()
         {
             InitializeComponent();
 
-            response = new ResponseSupport<byte>();
+            dataBindingSource = new BindingSourceInvoke(dataGridMessages);
+            dataGridMessages.DataSource = dataBindingSource;
+
+            mainService.OnMessageDataSource += (sender, source) => dataBindingSource.DataSource = source;
+            mainService.Init();
 
             telemetry = new Ets2SdkTelemetry();
             telemetry.Data += Telemetry_Data;
-            telemetry.JobFinished += Telemetry_JobFinished; ;
+            telemetry.JobFinished += Telemetry_JobFinished;
             telemetry.JobStarted += Telemetry_JobStarted;
 
             sender = new FramesSender();
@@ -44,7 +54,7 @@ namespace Symulator
             sender.Append(MessageType.GEARS, 1000);
 
             senderService = new FramesSenderService(sender.Iterator);
-            senderService.SendData += (data) =>
+            senderService.SendData += (sender, data) =>
             {
                 Console.WriteLine("SendFrame: {0}", data.CanId);
 
@@ -61,10 +71,6 @@ namespace Symulator
             timer.Tick += Timer_Tick;
         }
 
-        public const int FRAME_LENGTH = 16;
-        public const int REC_BUFFER_SIZE = 500;
-        public const int READ_TIMEOUT = 500;
-        public const int WRITE_TIMEOUT = 500;
         private void button1_Click(object sender, EventArgs e)
         {
             if (serialPort == null || !serialPort.IsOpen)
@@ -98,7 +104,7 @@ namespace Symulator
 
         private void sendConfig()
         {
-            int baudrate = 9600; //115200;
+            int baudrate = 115200;
 
             byte[] configUart = Frame.Builder()
                 .WithType(FrameType.CONFIG_UART)
@@ -156,10 +162,10 @@ namespace Symulator
             serialPort.Write(frame, 0, frame.Length);
             serialPort.DiscardOutBuffer();
 
-            this.Invoke(() => txtResData.AppendText($"-> {string.Join(", ", frame)}\n"));
+            //this.Invoke(() => txtResData.AppendText($"-> {string.Join(", ", frame)}\n"));
         }
 
-        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        private async void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             var sp = sender as SerialPort;
             if (!sp.IsOpen)
@@ -167,39 +173,14 @@ namespace Symulator
                 return;
             }
 
-            System.Threading.Thread.Sleep(50);
-
             var bytes = sp.BytesToRead;
             var buffer = new byte[bytes];
             sp.Read(buffer, 0, bytes);
 
-            //response.Append(buffer).SetTimeout((byte[] data) =>
-            //{
-            //    Console.WriteLine($"Index: {++index}, Ilość danych: {data.Length}");
-            //}, 10);
+            await mainService.AppendAsync(buffer);
 
-            if (buffer.Length % FRAME_LENGTH != 0)
-            {
-                Console.WriteLine("Ramka nie pełna");
-            }
-
-            txtResData.Invoke(() =>
-            {
-                for (int i = 0, l = buffer.Length; i < l; i += FRAME_LENGTH)
-                {
-                    var data = buffer.Skip(i).Take(FRAME_LENGTH).ToArray();
-                    var frame = Frame.Builder().With(data);
-
-                    var a = frame.CanId;
-                    var b = frame.Data;
-                    var c = frame.Length;
-
-                    txtResData.AppendText($"<- {string.Join(", ", data)}\n");
-                    txtResData.AppendText($"<- Data: {frame.CanId}, {frame.Length}, {string.Join(", ", frame.Data)}\n");
-
-                    //txtResData.AppendText($"<- {Encoding.UTF8.GetString(frame, 0, frame.Length)}\n");
-                }
-            });
+            //txtResData.Invoke(() => txtResData.AppendText($"<- {string.Join(", ", frameBytes)}\n"));
+            //txtResData.Invoke(() => txtResData.AppendText($"<- Data: {frame.CanId}, {frame.Length}, {string.Join(", ", frame.Data)}\n"));
         }
 
         private void button3_Click(object sender, EventArgs e)
@@ -247,7 +228,7 @@ namespace Symulator
 
         private void button6_Click(object sender, EventArgs e)
         {
-            txtResData.Clear();
+            //txtResData.Clear();
         }
 
         private void button4_Click(object sender, EventArgs e)
@@ -278,7 +259,6 @@ namespace Symulator
         {
             sendConfig();
         }
-
 
         private void Telemetry_Data(Ets2Telemetry data, bool newTimestamp)
         {

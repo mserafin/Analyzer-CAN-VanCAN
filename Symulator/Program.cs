@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Symulator;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace Symulator
-{
+//namespace Symulator
+//{
     static class Program
     {
         /// <summary>
@@ -16,7 +17,7 @@ namespace Symulator
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            Application.Run(new MainPresenter());
         }
     }
-}
+//}
